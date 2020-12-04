@@ -20,8 +20,7 @@ class DataProvider(object):
     """
     this class is to provide data for new episode
     """
-
-    def __init__(self, dataset_path, window_size=50, steps=730):
+    def __init__(self, dataset_path, window_size=50, steps=730, start_idx = 0):
         """
         :param dataset_path: the path of dataset
         :param steps: the total number of steps in each episode, default is 2 years
@@ -35,9 +34,9 @@ class DataProvider(object):
         self.steps = steps
 
         # change the start date
-        start_idx = 3000
-        self.data = self.data[:, int(start_idx):, :]
-        self.time = self.time[int(start_idx): ]
+        self.start_idx = start_idx
+        self.data = self.data[:, int(self.start_idx):, :]
+        self.time = self.time[int(self.start_idx): ]
 
         self.reset()
 
@@ -58,7 +57,6 @@ class DataProvider(object):
     def reset(self):
         self.step = 0
 
-        # normalize the data by closing price !!! wait to be added
         init_data = self.data[:, self.step:self.step + self.window_size, :].copy()
         init_time = self.time[self.step:self.step + self.window_size].copy()
         cash_position = np.ones((1, self.window_size, init_data.shape[2]))
@@ -120,13 +118,6 @@ class PortfolioInfo(object):
                 "market_return": y1.mean(),
                 "best_return": max(y1)}
 
-                # "weights_mean": w1.mean().astype(float),
-                # "weights_std": w1.std().astype(float)
-
-        #for i, name in enumerate(['cash'] + self.asset_names):
-        #    info['weight_' + name] = w1[i].astype(float)
-        #    info['price_' + name] = y1[i].astype(float)
-
         self.infos.append(info)
         return immediate_reward, info, done
 
@@ -138,7 +129,7 @@ class PortfolioInfo(object):
 
 class PortfolioEnv(gym.Env):
 
-    def __init__(self, dataset_path, window_size=50, steps=730, trading_cost=0.0025):
+    def __init__(self, dataset_path, window_size=50, steps=730, trading_cost=0.0025, start_idx = 0):
         """
         :param dataset_path: the path of dataset
         :param steps: the total number of steps in each episode, default is 2 years
@@ -147,7 +138,7 @@ class PortfolioEnv(gym.Env):
         """
 
         self.window_size = window_size
-        self.provider = DataProvider(dataset_path, self.window_size, steps)
+        self.provider = DataProvider(dataset_path, self.window_size, steps, start_idx)
         self.asset_dim = len(self.provider.asset_name) + 1
         self.feature_dim = self.provider.data.shape[-1]
 
@@ -215,18 +206,6 @@ class PortfolioEnv(gym.Env):
 
         return info
 
-    def plot(self, portfolio_value = True, cost = True, rate_of_return = True):
-        df_info = pd.DataFrame(self.infos)
-        df_info['time'] = pd.to_datetime(df_info['time'].values, format='%Y-%m-%d')
-        #df_info.set_index('time', inplace=True)
-
-        if portfolio_value:
-            plot_portfolio_value(df_info)
-        if cost:
-            plot_cost(df_info)
-        if rate_of_return:
-            plot_return(df_info)
-
     def save_info(self, info_path):
         df_info = pd.DataFrame(self.infos)
         df_info['time'] = pd.to_datetime(df_info['time'].values, format='%Y-%m-%d')
@@ -235,15 +214,6 @@ class PortfolioEnv(gym.Env):
                        "market_return", "best_return", "market_value", "best_value"]]
 
         df.to_csv(info_path)
-
-
-    def calculation(self):
-        df_info = pd.DataFrame(self.infos)
-
-        max_dd = max_drawdown(df_info.rate_of_return + 1)
-        sharpe_ratio = sharpe(df_info.rate_of_return, self.window_size)
-
-        return df_info, max_dd, sharpe_ratio
 
 
 if __name__ == "__main__":
@@ -262,17 +232,9 @@ if __name__ == "__main__":
     env = PortfolioEnv( dataset_path,
                         window_size=window_size,
                         steps=steps,
-                        trading_cost=trading_cost)
+                        trading_cost=trading_cost,
+                        start_idx = 0)
 
     info1 = env.reset()
 
-    # for i in range(3):
-       # action = env.action_space.sample()
-       # action /= action.sum()
-        #reward, info2, done = env.f_step(action)
-        #assert not done, "shouldn't be done after %s steps" % i
-
-    df_info = pd.DataFrame(env.infos)
-    #final_value = df_info.portfolio_value.iloc[-1]
-    #market_value = df_info.market_value.iloc[-1]
 

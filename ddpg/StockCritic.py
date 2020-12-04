@@ -10,13 +10,13 @@ def cnn_predictor(input_num, inputs, actions, previous_action, scope):
         N = inputs.get_shape()[3]  # feature
 
         # filter shape [height, width, channels, number of filters]
-        conv1_W = tf.Variable(tf.truncated_normal([1, 3, N, 3], stddev=0.05))  # eg: [?, 10, 2, 32]
-        layer = tf.nn.conv2d(inputs, filter=conv1_W, padding='VALID', strides=[1, 1, 1, 1])  # result: [?, 6, 1, 32]
+        conv1_W = tf.Variable(tf.truncated_normal([1, 3, N, 3], stddev=0.05))
+        layer = tf.nn.conv2d(inputs, filter=conv1_W, padding='VALID', strides=[1, 1, 1, 1])
         norm1 = tf.layers.batch_normalization(layer)
         x = tf.nn.relu(norm1)
 
         conv2_W = tf.Variable(tf.random_normal([1, L - 2, 3, 20], stddev=0.05))
-        conv2 = tf.nn.conv2d(x, filter=conv2_W, strides=[1, 1, 1, 1], padding='VALID')  # [1, 6, 1, 20]
+        conv2 = tf.nn.conv2d(x, filter=conv2_W, strides=[1, 1, 1, 1], padding='VALID')
         norm2 = tf.layers.batch_normalization(conv2)
         x = tf.nn.relu(norm2)
 
@@ -44,7 +44,7 @@ def rnn_predictor(input_num, inputs, actions, previous_action, scope):
         N = inputs.get_shape()[3]  # feature
 
         x=tf.reshape(inputs, shape=[-1, asset_dim, L*N])
-        hidden_size = 20
+        hidden_size = 10
 
         rnn_cells = []
         for i in range(asset_dim):
@@ -53,6 +53,7 @@ def rnn_predictor(input_num, inputs, actions, previous_action, scope):
         cell = tf.nn.rnn_cell.MultiRNNCell(rnn_cells)
         initial_state = cell.zero_state(input_num, tf.float32)
         net, state = tf.nn.dynamic_rnn(cell, x, initial_state=initial_state, dtype=tf.float32)
+        # state: [batch_size, hidden_size];  outputs: [batch_size, L, hidden_size]
 
         x = tf.reshape(net, [-1, int(asset_dim), 1, hidden_size])
         previous_w = tf.reshape(previous_action, [-1, int(asset_dim), 1, 1])
@@ -60,24 +61,14 @@ def rnn_predictor(input_num, inputs, actions, previous_action, scope):
         w = tf.reshape(actions, [-1, int(asset_dim), 1, 1])
         x = tf.concat([x, w], axis=3)
 
-        conv3_W = tf.Variable(tf.random_normal([1, 1, 22, 1], stddev=0.05))
-        conv3 = tf.nn.conv2d(x, filter=conv3_W, strides=[1, 1, 1, 1], padding='VALID')
-        norm3 = tf.layers.batch_normalization(conv3)
-        net = tf.nn.relu(norm3)
-
-        net = tf.layers.flatten(net)
+        x = tf.layers.flatten(x)
+        net = tf.layers.dense(x, 64, activation=tf.nn.relu)
         out = tf.layers.dense(net, 1, kernel_initializer=tf.random_uniform_initializer(-0.003, 0.003))
 
     return out
 
-    # state: [batch_size, hidden_size];  outputs: [batch_size, L, hidden_size]
-
 
 class StockCritic:
-    """
-    input of the network in the state and action
-    output is the Q(s, a)
-    """
     def __init__(self,sess, asset_dim, window_size, feature_dim, learning_rate, tau, gamma, num_actor_vars, nn = "cnn"):
         self.sess = sess
         self.asset_dim = asset_dim
@@ -108,7 +99,6 @@ class StockCritic:
         self.action_grads = tf.gradients(self.out, self.action)
 
     def build_critic_network(self, scope, nn):
-        # here use the current weights and previous weights, one is the action, other is the component of state
 
         with tf.variable_scope(scope):
             input_num = tf.placeholder(tf.int32, shape=[])
@@ -166,11 +156,6 @@ if __name__=="__main__":
     tau = 0.001
     gamma = 0.99
     num_actor_vars = 0
-    critic = StockCritic(sesson, num_stock, window_size, num_feature, learning_rate, tau, gamma, num_actor_vars)
+    critic = StockCritic(sesson, num_stock, window_size, num_feature, learning_rate, tau, gamma, num_actor_vars, "cnn")
 
     net = critic.build_critic_network("a", "cnn")
-
-    #inputs = np.random.random((1, 7, 5, 4))
-    #previous_action = np.random.random((1, 7))
-    #actions = np.random.random((1, 7))
-    #critic.action_gradients(1, inputs, previous_action, actions)

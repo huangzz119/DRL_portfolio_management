@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
+import pandas as pd
 import json
 
 from ddpg.replay_buffer import ReplayBuffer
@@ -34,12 +35,12 @@ class DDPG():
     the training algorithm
     """
     def __init__(self, env, sess, actor, critic, actor_noise, config, nn,
-                 model_save_path = "weights/ddpg/ddpg.ckpt",
-                 summary_path = "results/ddpg"):
+                 model_save_path,summary_path, train_path ):
 
         self.config = config
         self.model_save_path = model_save_path
         self.summary_path = summary_path
+        self.train_path = train_path
 
         self.sess = sess
         self.env = env
@@ -62,6 +63,10 @@ class DDPG():
         batch_size = self.config['batch_size']
         gamma = self.config['gamma']
         self.buffer = ReplayBuffer(self.config['buffer_size'], np.random.seed(self.config['seed']))
+
+        reward_set = []
+        loss_set = []
+        q_value_set = []
 
         for i in range(num_episode):
             info = self.env.reset()
@@ -134,12 +139,21 @@ class DDPG():
                     writer.add_summary(summary_str, i)
                     writer.flush()
 
+                    reward_set.append(ep_reward)
+                    q_value_set.append(ep_ave_max_q/float(j))
+                    loss_set.append( ep_loss/float(j))
+
                     print("------------------------------------------------------------------------------------------------")
-                    print('Episode: {:d}, Reward: {:.4f}, Qmax: {:.4f}, loss: {:.4f}'.format(i, ep_reward, (ep_ave_max_q / float(j)), ep_loss/float(j) * 100))
+                    print('Episode: {:d}, Reward: {:.4f}, Qmax: {:.4f}, loss: {:.4f}'.format(i, ep_reward, (ep_ave_max_q / float(j)), ep_loss/float(j) ))
                     break
 
         self.save_model()
+
+        df = pd.DataFrame({"loss":loss_set, "q_value":q_value_set,"reward":reward_set})
+        df.to_csv(self.train_path)
         print('Finish.')
+
+        return df
 
     def save_model(self):
         if not os.path.exists(self.model_save_path):
@@ -186,7 +200,8 @@ if __name__=="__main__":
 
         ddpg = DDPG(env, sess, actor, critic, actor_noise, config, nn,
                     model_save_path = fileDir+ path + "ckpt",
-                    summary_path = fileDir+path + "logdir")
+                    summary_path = fileDir+path + "logdir",
+                    train_path= fileDir+path +"train_info.csv")
 
         ddpg.train()
         ddpg.env.save_info(info_path= fileDir+path + "info.csv")
