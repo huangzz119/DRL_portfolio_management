@@ -1,6 +1,4 @@
 import tensorflow.compat.v1 as tf
-import tflearn
-import tensorboard
 
 def cnn_predictor(input_num, inputs, previous_action, scope):
     with tf.variable_scope(scope):

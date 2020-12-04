@@ -1,7 +1,3 @@
-"""
-Obtained from https://github.com/vermouth1992/drl-portfolio-management/blob/master/src/environment/portfolio.py
-"""
-
 from __future__ import print_function
 
 import numpy as np
@@ -9,7 +5,7 @@ import pandas as pd
 
 import gym
 import gym.spaces
-from data.utils import read_data, sharpe, max_drawdown, plot_portfolio_value, plot_cost, plot_return
+from data.utils import read_data
 
 import os
 import sys
