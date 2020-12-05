@@ -1,3 +1,7 @@
+"""
+Modified from https://github.com/vermouth1992/drl-portfolio-management/blob/master/src/environment/portfolio.py
+"""
+
 from __future__ import print_function
 
 import numpy as np
@@ -16,6 +20,7 @@ class DataProvider(object):
     """
     this class is to provide data for new episode
     """
+
     def __init__(self, dataset_path, window_size=50, steps=730, start_idx = 0):
         """
         :param dataset_path: the path of dataset
@@ -53,6 +58,7 @@ class DataProvider(object):
     def reset(self):
         self.step = 0
 
+        # normalize the data by closing price !!! wait to be added
         init_data = self.data[:, self.step:self.step + self.window_size, :].copy()
         init_time = self.time[self.step:self.step + self.window_size].copy()
         cash_position = np.ones((1, self.window_size, init_data.shape[2]))
@@ -82,7 +88,7 @@ class PortfolioInfo(object):
         :param w1: new action of portfolio weights, dim = asset_dim
         :param y1: price relative vector close/open
         """
-
+        
         eps = 1e-8     # to avoid be divided by 0
         p0 = self.p0
         w0 = self.w0
@@ -125,7 +131,7 @@ class PortfolioInfo(object):
 
 class PortfolioEnv(gym.Env):
 
-    def __init__(self, dataset_path, window_size=50, steps=730, trading_cost=0.0025, start_idx = 0):
+    def __init__(self, dataset_path, window_size=50, steps=730, trading_cost=0.0025, start_idx=0):
         """
         :param dataset_path: the path of dataset
         :param steps: the total number of steps in each episode, default is 2 years
@@ -206,11 +212,11 @@ class PortfolioEnv(gym.Env):
         df_info = pd.DataFrame(self.infos)
         df_info['time'] = pd.to_datetime(df_info['time'].values, format='%Y-%m-%d')
 
-        df = df_info[["time", "rate_of_return", "log_return", "portfolio_value","cost"
+        df = df_info[["time", "rate_of_return", "log_return", "portfolio_value","cost",
                        "market_return", "best_return", "market_value", "best_value"]]
 
         df.to_csv(info_path)
-
+        
 
 if __name__ == "__main__":
 
@@ -219,18 +225,15 @@ if __name__ == "__main__":
     steps = 10
     asset_names = ["V"]
     trading_cost = 0.0025
+    start_idx = 0
 
 
-    provider = DataProvider(dataset_path, window_size, steps)
-
+    provider = DataProvider(dataset_path, window_size, steps, start_idx)
     portfolio_info = PortfolioInfo(asset_names, steps, trading_cost)
-
     env = PortfolioEnv( dataset_path,
                         window_size=window_size,
                         steps=steps,
                         trading_cost=trading_cost,
-                        start_idx = 0)
+                        start_idx = start_idx)
 
     info1 = env.reset()
-
-

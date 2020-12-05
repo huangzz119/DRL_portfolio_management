@@ -1,13 +1,12 @@
+"""
+Modified from https://github.com/vermouth1992/drl-portfolio-management/blob/master/src/model/ddpg
+"""
+
 import numpy as np
 import tensorflow.compat.v1 as tf
 import pandas as pd
-import json
 
 from ddpg.replay_buffer import ReplayBuffer
-from ddpg.StockActor import StockActor
-from ddpg.StockCritic import StockCritic
-from ddpg.portfolio import PortfolioEnv
-from ddpg.ornstein_uhlenbeck import OrnsteinUhlenbeckActionNoise
 from data.utils import normalize_state
 
 import os
@@ -35,12 +34,12 @@ class DDPG():
     the training algorithm
     """
     def __init__(self, env, sess, actor, critic, actor_noise, config, nn,
-                 model_save_path,summary_path, train_path ):
+                 model_save_path, summary_path, train_info_path):
 
         self.config = config
         self.model_save_path = model_save_path
         self.summary_path = summary_path
-        self.train_path = train_path
+        self.train_info_path = train_info_path
 
         self.sess = sess
         self.env = env
@@ -63,10 +62,10 @@ class DDPG():
         batch_size = self.config['batch_size']
         gamma = self.config['gamma']
         self.buffer = ReplayBuffer(self.config['buffer_size'], np.random.seed(self.config['seed']))
-
+        
         reward_set = []
-        loss_set = []
         q_value_set = []
+        loss_set = []
 
         for i in range(num_episode):
             info = self.env.reset()
@@ -129,8 +128,6 @@ class DDPG():
                     self.actor.update_target_network()
                     self.critic.update_target_network()
 
-                    # print('Step: {:d}, r: {:.4f}, q: {:.4f}, loss: {:.4f}'.format(j, reward, q_value[0][0], critic_loss * 100))
-
                 if done or j == self.config['steps'] - 1:
                     summary_str = self.sess.run(self.summary_ops,
                                                 feed_dict={self.summary_vars[0]: ep_reward,
@@ -138,22 +135,21 @@ class DDPG():
 
                     writer.add_summary(summary_str, i)
                     writer.flush()
-
+                    
                     reward_set.append(ep_reward)
-                    q_value_set.append(ep_ave_max_q/float(j))
-                    loss_set.append( ep_loss/float(j))
-
+                    q_value_set.append((ep_ave_max_q / float(j)))
+                    loss_set.append(ep_loss/float(j) * 100)
                     print("------------------------------------------------------------------------------------------------")
-                    print('Episode: {:d}, Reward: {:.4f}, Qmax: {:.4f}, loss: {:.4f}'.format(i, ep_reward, (ep_ave_max_q / float(j)), ep_loss/float(j) ))
+                    print('Episode: {:d}, Reward: {:.4f}, Qmax: {:.4f}, loss: {:.4f}'.format(i, ep_reward, (ep_ave_max_q / float(j)), ep_loss/float(j) * 100))
                     break
 
         self.save_model()
-
-        df = pd.DataFrame({"loss":loss_set, "q_value":q_value_set,"reward":reward_set})
-        df.to_csv(self.train_path)
+        
+        train_info = pd.DataFrame({"reward": reward_set, "q_value": q_value_set, "loss": loss_set})
+        train_info.to_csv(self.train_info_path)
         print('Finish.')
-
-        return df
+        
+        return train_info
 
     def save_model(self):
         if not os.path.exists(self.model_save_path):
@@ -162,52 +158,5 @@ class DDPG():
         saver = tf.train.Saver()
         model_path = saver.save(self.sess, self.model_save_path)
         print("Model saved in %s" % model_path)
-
-if __name__=="__main__":
-
-    with open(fileDir+'/config/default.json', 'r') as f:
-        config = json.load(f)
-
-    dataset_path = fileDir + '/data/data1130'
-
-    trading_cost = config["trading_cost"]
-    actor_learning_rate = config["actor_learning_rate"]
-    critic_learning_rate = config["critic_learning_rate"]
-    tau = config["tau"]
-    gamma = config["gamma"]
-    batch_size = config["batch_size"]
-    steps = config["steps"]
-    window_size = config["window_length"]
-    nn = config["nn"]
-    path  = config["path"]
-
-    env = PortfolioEnv(dataset_path,
-                       window_size=window_size,
-                       steps=steps,
-                       trading_cost=trading_cost)
-
-    info = env.reset()
-    asset_dim = info["observation"].shape[0]
-    feature_dim = info["observation"].shape[2]
-
-    with tf.Session() as sess:
-
-        actor = StockActor(sess, asset_dim, window_size, feature_dim, actor_learning_rate, tau, batch_size, nn)
-        num_actor_vars = actor.num_trainable_vars
-        critic = StockCritic(sess, asset_dim, window_size, feature_dim, critic_learning_rate, tau, gamma, num_actor_vars, nn)
-
-        actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(asset_dim))
-
-        ddpg = DDPG(env, sess, actor, critic, actor_noise, config, nn,
-                    model_save_path = fileDir+ path + "ckpt",
-                    summary_path = fileDir+path + "logdir",
-                    train_path= fileDir+path +"train_info.csv")
-
-        ddpg.train()
-        ddpg.env.save_info(info_path= fileDir+path + "info.csv")
-
-    #ddpg.env.plot()
-
-
 
 
