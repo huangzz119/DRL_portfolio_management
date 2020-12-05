@@ -1,19 +1,19 @@
 {
-  "episode": 12,
-  "steps": 1200,
+  "episode": 10,
+  "steps": 1000,
   "batch_size": 64,
   "buffer_size": 1000,
-  "window_length": 50,
-
-  "nn": "cnn",
+  "window_length": 100,
 
   "tau": 0.01,
-  "gamma": 0.001,
+  "gamma": 0.88,
   "actor_learning_rate": 0.001,
-  "critic_learning_rate": 0.1,
+  "critic_learning_rate": 0.001,
 
   "seed": 1337,
   "trading_cost": 0.0025,
 
-  "path": "/result1/ddpg-cnn/"
+  "nn": "cnn",
+  "start_idx": 3500,
+  "path": "/result_3500/ddpg-cnn/"
 }
